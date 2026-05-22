@@ -58,7 +58,9 @@ app.use((err, req, res, next) => {
     message: err.message || 'Internal server error'
   });
 });
-
+app.get('/', (req, res) => {
+  res.send('ByteMind backend is running');
+});
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
