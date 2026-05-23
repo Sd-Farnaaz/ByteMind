@@ -22,6 +22,7 @@ import {
 const ChatInterface = ({ user, setUser }) => {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const [message, setMessage] = useState('');
 
@@ -60,10 +61,10 @@ const ChatInterface = ({ user, setUser }) => {
 
   const loadMessages = async (conversation) => {
 
-    setConversationId(conversation._id);
+    setConversationId(conversation.conversationId);
 
     const data = await getConversationMessages(
-      conversation._id
+      conversation.conversationId
     );
 
     if (data.success) {
@@ -147,19 +148,14 @@ const ChatInterface = ({ user, setUser }) => {
   };
 
   const handleRenameConversation = async (
-    conversation
+    conversationId,
+    newTitle
   ) => {
-
-    const title = prompt(
-      'Enter new conversation name:',
-      conversation.title
-    );
-
-    if (!title) return;
+    if (!newTitle || !newTitle.trim()) return;
 
     await renameConversation(
-      conversation._id,
-      title
+      conversationId,
+      newTitle.trim()
     );
 
     loadConversations();
@@ -183,6 +179,9 @@ const ChatInterface = ({ user, setUser }) => {
         onDeleteConversation={handleDeleteConversation}
         onClearConversation={handleClearConversation}
         onRenameConversation={handleRenameConversation}
+        user={user}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
       {/* MAIN */}
@@ -194,12 +193,18 @@ const ChatInterface = ({ user, setUser }) => {
           <div className="flex items-center gap-4">
 
             <button
-              onClick={() =>
-                setSidebarOpen(true)
-              }
-              className="md:hidden w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center"
+              onClick={() => {
+                if (window.innerWidth < 768) {
+                  setSidebarOpen(true);
+                } else {
+                  setSidebarCollapsed(false);
+                }
+              }}
+              className={`${
+                sidebarCollapsed ? 'md:flex' : 'md:hidden'
+              } w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-all duration-200`}
             >
-              <FiMenu size={22} />
+              <FiMenu size={22} className="text-slate-600" />
             </button>
 
             <div>
