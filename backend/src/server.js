@@ -12,10 +12,10 @@ const app = express();
 
 connectDB();
 
-aapp.use(cors({
+app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://bytemind-frontend-0pwx.onrender.com/'
+    'https://bytemind-frontend-0pwx.onrender.com'
   ],
   credentials: true
 }));
