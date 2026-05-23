@@ -143,9 +143,7 @@ const ChatInterface = ({ user, setUser }) => {
 
       if (response.success) {
         setConversations((prev) =>
-          prev.filter(
-            (conv) => conv.conversationId !== conversationId
-          )
+          prev.filter((conv) => conv.conversationId !== conversationId),
         );
 
         if (currentConversation === conversationId) {
@@ -173,22 +171,13 @@ const ChatInterface = ({ user, setUser }) => {
     }
   };
 
-  const renameConversationItem = async (
-    conversationId,
-    currentTitle
-  ) => {
-    const newTitle = prompt(
-      "Enter new conversation title",
-      currentTitle || ""
-    );
+  const renameConversationItem = async (conversationId, currentTitle) => {
+    const newTitle = prompt("Enter new conversation title", currentTitle || "");
 
     if (!newTitle) return;
 
     try {
-      const response = await renameConversation(
-        conversationId,
-        newTitle
-      );
+      const response = await renameConversation(conversationId, newTitle);
 
       if (response.success) {
         setConversations((prev) =>
@@ -198,8 +187,8 @@ const ChatInterface = ({ user, setUser }) => {
                   ...conv,
                   title: newTitle,
                 }
-              : conv
-          )
+              : conv,
+          ),
         );
 
         toast.success("Conversation renamed");
@@ -211,43 +200,46 @@ const ChatInterface = ({ user, setUser }) => {
 
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden">
-
       {/* MOBILE OVERLAY */}
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
-          className="fixed inset-0 bg-black/40 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 lg:hidden"
         />
       )}
 
       {/* SIDEBAR */}
       <div
         className={`
-          fixed lg:relative z-50 lg:z-auto
-          h-full bg-white border-r border-gray-200 flex flex-col
-          transition-all duration-300 overflow-hidden
-          ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0
-          w-[85%] sm:w-72 lg:w-80
-        `}
+    fixed lg:static top-0 left-0
+    z-[60] h-full
+    bg-white border-r border-gray-200
+    flex flex-col
+    transition-transform duration-300 ease-in-out
+    overflow-y-auto
+
+    w-[280px] sm:w-[320px]
+
+    ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+
+    lg:translate-x-0
+    lg:flex
+    lg:w-80
+    shrink-0
+  `}
       >
         {/* HEADER */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">
-
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center text-white font-bold">
                 B
               </div>
 
               <div>
-                <h1 className="font-semibold text-gray-800">
-                  ByteMind
-                </h1>
+                <h1 className="font-semibold text-gray-800">ByteMind</h1>
 
-                <p className="text-xs text-gray-500">
-                  AI Assistant
-                </p>
+                <p className="text-xs text-gray-500">AI Assistant</p>
               </div>
             </div>
 
@@ -273,7 +265,6 @@ const ChatInterface = ({ user, setUser }) => {
         {/* CONVERSATIONS */}
         <div className="flex-1 overflow-y-auto px-4 pb-4">
           <div className="space-y-2">
-
             {conversations.map((conv) => (
               <div
                 key={conv.conversationId}
@@ -301,20 +292,14 @@ const ChatInterface = ({ user, setUser }) => {
                   </div>
 
                   <div className="text-xs text-gray-400 mt-1">
-                    {new Date(
-                      conv.updatedAt
-                    ).toLocaleDateString()}
+                    {new Date(conv.updatedAt).toLocaleDateString()}
                   </div>
                 </button>
 
                 <div className="flex flex-wrap gap-2 mt-3">
-
                   <button
                     onClick={() =>
-                      renameConversationItem(
-                        conv.conversationId,
-                        conv.title
-                      )
+                      renameConversationItem(conv.conversationId, conv.title)
                     }
                     className="text-xs px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200"
                   >
@@ -322,9 +307,7 @@ const ChatInterface = ({ user, setUser }) => {
                   </button>
 
                   <button
-                    onClick={() =>
-                      deleteConversationItem(conv.conversationId)
-                    }
+                    onClick={() => deleteConversationItem(conv.conversationId)}
                     className="text-xs px-2 py-1 rounded-lg bg-red-500 text-white hover:bg-red-600"
                   >
                     Delete
@@ -332,9 +315,7 @@ const ChatInterface = ({ user, setUser }) => {
 
                   <button
                     onClick={() =>
-                      clearConversationMessages(
-                        conv.conversationId
-                      )
+                      clearConversationMessages(conv.conversationId)
                     }
                     className="text-xs px-2 py-1 rounded-lg bg-yellow-100 hover:bg-yellow-200"
                   >
@@ -348,17 +329,11 @@ const ChatInterface = ({ user, setUser }) => {
 
         {/* FOOTER */}
         <div className="p-4 border-t border-gray-200">
-
           <div className="flex items-center justify-between gap-3">
-
             <div className="flex-1 overflow-hidden">
-              <p className="text-sm font-medium truncate">
-                {user?.name}
-              </p>
+              <p className="text-sm font-medium truncate">{user?.name}</p>
 
-              <p className="text-xs text-gray-500 truncate">
-                {user?.email}
-              </p>
+              <p className="text-xs text-gray-500 truncate">{user?.email}</p>
             </div>
 
             <button
@@ -372,37 +347,29 @@ const ChatInterface = ({ user, setUser }) => {
       </div>
 
       {/* MAIN CHAT */}
-      <div className="flex-1 flex flex-col bg-slate-50 min-w-0">
-
+      <div className="flex-1 flex flex-col bg-slate-50 min-w-0 w-full">
         {/* MOBILE HEADER */}
-        <div className="lg:hidden bg-white border-b border-slate-200 p-4 flex items-center gap-3">
-
+        {/* MOBILE HEADER */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3 shadow-sm">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-xl hover:bg-slate-100"
+            className="w-11 h-11 rounded-xl bg-slate-100 flex items-center justify-center active:scale-95 transition"
           >
             ☰
           </button>
 
           <div>
-            <h2 className="font-semibold text-slate-800">
-              ByteMind
-            </h2>
+            <h2 className="font-semibold text-slate-800 text-lg">ByteMind</h2>
 
-            <p className="text-xs text-slate-500">
-              Online
-            </p>
+            <p className="text-xs text-emerald-500">● Online</p>
           </div>
         </div>
 
         {/* MESSAGES */}
         <div className="flex-1 overflow-y-auto p-3 sm:p-4 md:p-6 xl:px-8">
-
           {messages.length === 0 ? (
             <div className="h-full flex items-center justify-center">
-
               <div className="text-center max-w-md">
-
                 <div className="w-20 h-20 rounded-full bg-primary-100 flex items-center justify-center mx-auto mb-4 text-3xl">
                   🤖
                 </div>
@@ -418,7 +385,6 @@ const ChatInterface = ({ user, setUser }) => {
             </div>
           ) : (
             <div className="max-w-3xl mx-auto">
-
               {messages.map((message, index) => (
                 <motion.div
                   key={message.id}
@@ -456,11 +422,7 @@ const ChatInterface = ({ user, setUser }) => {
         {/* INPUT */}
         <div className="border-t border-slate-200 bg-white">
           <div className="max-w-4xl mx-auto px-3 sm:px-4 md:px-6 py-4">
-
-            <ChatInput
-              onSendMessage={handleSendMessage}
-              disabled={isLoading}
-            />
+            <ChatInput onSendMessage={handleSendMessage} disabled={isLoading} />
 
             <p className="text-xs text-center text-slate-500 mt-4">
               AI responses may be inaccurate. Verify important information.
