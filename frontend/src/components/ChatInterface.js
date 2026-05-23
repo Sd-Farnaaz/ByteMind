@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+
 import {
   FiMenu,
   FiSend,
@@ -7,19 +8,30 @@ import {
   FiUser
 } from 'react-icons/fi';
 
-import {
-  sendMessage,
-  getConversations
-} from '../services/chatService';
-
 import Sidebar from './Sidebar';
 
+import {
+  sendMessage,
+  getConversations,
+  getConversationMessages,
+  deleteConversation,
+  clearConversation,
+  renameConversation
+} from '../services/chatService';
+
 const ChatInterface = ({ user, setUser }) => {
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const [message, setMessage] = useState('');
+
   const [messages, setMessages] = useState([]);
+
   const [loading, setLoading] = useState(false);
+
   const [conversationId, setConversationId] = useState(null);
+
+  const [conversations, setConversations] = useState([]);
 
   const messagesEndRef = useRef(null);
 
@@ -38,52 +50,62 @@ const ChatInterface = ({ user, setUser }) => {
   };
 
   const loadConversations = async () => {
-    try {
-      const data = await getConversations();
 
-      if (
-        data.success &&
-        data.conversations.length > 0
-      ) {
-        setConversationId(data.conversations[0]._id);
-      }
-    } catch (err) {
-      console.log(err);
+    const data = await getConversations();
+
+    if (data.success) {
+      setConversations(data.conversations || []);
+    }
+  };
+
+  const loadMessages = async (conversation) => {
+
+    setConversationId(conversation._id);
+
+    const data = await getConversationMessages(
+      conversation._id
+    );
+
+    if (data.success) {
+      setMessages(data.messages || []);
     }
   };
 
   const handleSend = async () => {
+
     if (!message.trim()) return;
 
-    const userMessage = {
-      role: 'user',
-      content: message
-    };
+    const tempMessage = message;
 
-    setMessages((prev) => [...prev, userMessage]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: tempMessage
+      }
+    ]);
 
-    const currentMessage = message;
     setMessage('');
+
     setLoading(true);
 
     try {
+
       const response = await sendMessage(
-        currentMessage,
+        tempMessage,
         conversationId
       );
 
       if (response.success) {
-        const aiMessage = {
-          role: 'assistant',
-          content:
-            response.message ||
-            response.reply ||
-            'No response'
-        };
 
         setMessages((prev) => [
           ...prev,
-          aiMessage
+          {
+            role: 'assistant',
+            content:
+              response.message ||
+              response.reply
+          }
         ]);
 
         if (response.conversationId) {
@@ -91,78 +113,83 @@ const ChatInterface = ({ user, setUser }) => {
             response.conversationId
           );
         }
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content:
-              response.error ||
-              'Failed to send message'
-          }
-        ]);
+
+        loadConversations();
       }
+
     } catch (err) {
+
       console.log(err);
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: 'assistant',
-          content: 'Server error occurred'
-        }
-      ]);
     }
 
     setLoading(false);
   };
 
+  const handleDeleteConversation = async (id) => {
+
+    await deleteConversation(id);
+
+    setMessages([]);
+
+    setConversationId(null);
+
+    loadConversations();
+  };
+
+  const handleClearConversation = async () => {
+
+    if (!conversationId) return;
+
+    await clearConversation(conversationId);
+
+    setMessages([]);
+  };
+
+  const handleRenameConversation = async (
+    conversation
+  ) => {
+
+    const title = prompt(
+      'Enter new conversation name:',
+      conversation.title
+    );
+
+    if (!title) return;
+
+    await renameConversation(
+      conversation._id,
+      title
+    );
+
+    loadConversations();
+  };
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-100">
 
-      {/* OVERLAY */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/40 z-40 md:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
       {/* SIDEBAR */}
-      <div
-        className={`
-          fixed md:relative top-0 left-0 z-50
-          h-full w-[280px]
-          bg-white border-r border-slate-200
-          transform transition-transform duration-300
-          ${
-            sidebarOpen
-              ? 'translate-x-0'
-              : '-translate-x-full'
-          }
-          md:translate-x-0
-          shrink-0
-        `}
-      >
-        <Sidebar
-          isOpen={true}
-          onClose={() => setSidebarOpen(false)}
-          onNewChat={() => {
-            setMessages([]);
-            setConversationId(null);
-          }}
-          onClearChat={() => {
-            setMessages([]);
-          }}
-          conversationId={conversationId}
-        />
-      </div>
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onNewChat={() => {
+          setMessages([]);
+          setConversationId(null);
+          setSidebarOpen(false);
+        }}
+        conversations={conversations}
+        currentConversationId={conversationId}
+        onSelectConversation={loadMessages}
+        onDeleteConversation={handleDeleteConversation}
+        onClearConversation={handleClearConversation}
+        onRenameConversation={handleRenameConversation}
+      />
 
       {/* MAIN */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
 
         {/* HEADER */}
-        <div className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
+        <div className="h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0">
 
           <div className="flex items-center gap-4">
 
@@ -176,7 +203,7 @@ const ChatInterface = ({ user, setUser }) => {
             </button>
 
             <div>
-              <h1 className="font-bold text-slate-800 text-lg">
+              <h1 className="text-xl font-bold text-slate-800">
                 ByteMind
               </h1>
 
@@ -194,87 +221,86 @@ const ChatInterface = ({ user, setUser }) => {
           </button>
         </div>
 
-        {/* CHAT AREA */}
+        {/* CHAT */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
 
-          <div className="max-w-4xl mx-auto">
+          {messages.length === 0 ? (
 
-            {messages.length === 0 ? (
-              <div className="h-full flex items-center justify-center">
+            <div className="h-full flex items-center justify-center">
 
-                <div className="text-center">
+              <div className="text-center">
 
-                  <div className="text-6xl mb-6">
-                    🤖
-                  </div>
-
-                  <h2 className="text-4xl font-bold text-slate-700 mb-4">
-                    Welcome, {user?.name}!
-                  </h2>
-
-                  <p className="text-slate-500 text-lg">
-                    Ask me anything and start
-                    chatting with AI.
-                  </p>
+                <div className="text-6xl mb-6">
+                  🤖
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
 
-                {messages.map((msg, index) => (
+                <h2 className="text-4xl font-bold text-slate-700 mb-4">
+                  Welcome, {user?.name}!
+                </h2>
+
+                <p className="text-slate-500 text-lg">
+                  Ask me anything and start chatting with AI.
+                </p>
+              </div>
+            </div>
+
+          ) : (
+
+            <div className="max-w-4xl mx-auto space-y-6">
+
+              {messages.map((msg, index) => (
+
+                <div
+                  key={index}
+                  className={`flex ${
+                    msg.role === 'user'
+                      ? 'justify-end'
+                      : 'justify-start'
+                  }`}
+                >
+
                   <div
-                    key={index}
-                    className={`flex ${
-                      msg.role === 'user'
-                        ? 'justify-end'
-                        : 'justify-start'
-                    }`}
+                    className={`
+                      max-w-[85%]
+                      rounded-3xl
+                      px-5 py-4
+                      ${
+                        msg.role === 'user'
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-white border border-slate-200 text-slate-700'
+                      }
+                    `}
                   >
-                    <div
-                      className={`
-                        max-w-[85%] rounded-3xl px-5 py-4
-                        ${
-                          msg.role === 'user'
-                            ? 'bg-indigo-500 text-white'
-                            : 'bg-white border border-slate-200 text-slate-700'
-                        }
-                      `}
-                    >
-                      <div className="flex items-start gap-3">
 
-                        <div className="mt-1">
-                          {msg.role === 'user' ? (
-                            <FiUser />
-                          ) : (
-                            '🤖'
-                          )}
-                        </div>
+                    <div className="flex gap-3">
 
-                        <p className="whitespace-pre-wrap leading-7">
-                          {msg.content}
-                        </p>
+                      <div>
+                        {msg.role === 'user'
+                          ? <FiUser />
+                          : '🤖'}
                       </div>
+
+                      <p className="leading-7 whitespace-pre-wrap">
+                        {msg.content}
+                      </p>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
 
-                {loading && (
-                  <div className="flex justify-start">
+              {loading && (
+                <div className="bg-white border border-slate-200 rounded-3xl px-5 py-4 inline-block">
+                  Thinking...
+                </div>
+              )}
 
-                    <div className="bg-white border border-slate-200 rounded-3xl px-5 py-4">
-                      Thinking...
-                    </div>
-                  </div>
-                )}
-
-                <div ref={messagesEndRef} />
-              </div>
-            )}
-          </div>
+              <div ref={messagesEndRef} />
+            </div>
+          )}
         </div>
 
         {/* INPUT */}
-        <div className="border-t border-slate-200 bg-white p-4">
+        <div className="border-t border-slate-200 bg-white p-4 shrink-0">
 
           <div className="max-w-4xl mx-auto">
 
@@ -287,7 +313,7 @@ const ChatInterface = ({ user, setUser }) => {
                   setMessage(e.target.value)
                 }
                 placeholder="Ask anything..."
-                className="flex-1 resize-none bg-transparent outline-none text-slate-700"
+                className="flex-1 resize-none bg-transparent outline-none"
               />
 
               <button className="w-12 h-12 rounded-2xl bg-slate-200 flex items-center justify-center">

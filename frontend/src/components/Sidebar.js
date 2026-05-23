@@ -1,8 +1,8 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   FiPlus,
   FiTrash2,
+  FiEdit2,
   FiX,
   FiMessageSquare
 } from 'react-icons/fi';
@@ -11,58 +11,49 @@ const Sidebar = ({
   isOpen,
   onClose,
   onNewChat,
-  onClearChat,
-  conversationId
+  conversations,
+  currentConversationId,
+  onSelectConversation,
+  onDeleteConversation,
+  onClearConversation,
+  onRenameConversation
 }) => {
   return (
     <>
-      {/* Mobile Overlay */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black z-40 md:hidden"
-          />
-        )}
-      </AnimatePresence>
+      {/* Overlay */}
+      {isOpen && (
+        <div
+          onClick={onClose}
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+        />
+      )}
 
       {/* Sidebar */}
-      <motion.div
-        initial={false}
-        animate={{
-          x: isOpen ? 0 : -320
-        }}
-        transition={{
-          type: 'tween',
-          duration: 0.3
-        }}
-        className="
+      <div
+        className={`
           fixed md:relative
-          left-0 top-0
+          top-0 left-0 z-50
           h-screen
-          w-[85%] sm:w-72 md:w-80
+          w-[280px]
           bg-white
-          border-r border-gray-200
-          shadow-xl md:shadow-none
-          z-50
+          border-r border-slate-200
           flex flex-col
+          transition-transform duration-300
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           md:translate-x-0
-        "
+        `}
       >
         {/* Header */}
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-800">
+        <div className="h-16 border-b border-slate-200 flex items-center justify-between px-4 shrink-0">
+          <h2 className="text-xl font-bold text-slate-800">
             Conversations
           </h2>
 
           <button
             onClick={onClose}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            className="md:hidden"
           >
-            <FiX size={20} />
+            <FiX size={22} />
           </button>
         </div>
 
@@ -70,59 +61,85 @@ const Sidebar = ({
         <div className="p-4">
           <button
             onClick={onNewChat}
-            className="
-              w-full
-              flex items-center justify-center gap-2
-              px-4 py-3
-              rounded-xl
-              bg-blue-600
-              hover:bg-blue-700
-              text-white
-              font-medium
-              transition
-            "
+            className="w-full h-12 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white font-semibold flex items-center justify-center gap-2"
           >
-            <FiPlus size={18} />
+            <FiPlus />
             New Conversation
           </button>
         </div>
 
-        {/* Chats */}
-        <div className="flex-1 overflow-y-auto px-4 pb-4 scrollbar-thin">
-          <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 flex items-center gap-3">
-            <FiMessageSquare className="text-blue-600" />
+        {/* Conversation List */}
+        <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3">
 
-            <div className="overflow-hidden">
-              <p className="font-medium text-gray-800 truncate">
-                Current Chat
-              </p>
+          {conversations.map((conv) => (
+            <div
+              key={conv._id}
+              className={`
+                rounded-2xl border p-3 transition cursor-pointer
+                ${
+                  currentConversationId === conv._id
+                    ? 'bg-indigo-50 border-indigo-200'
+                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                }
+              `}
+            >
+              <div
+                onClick={() => {
+                  onSelectConversation(conv);
+                  onClose();
+                }}
+              >
+                <div className="flex items-center gap-2 mb-2">
+                  <FiMessageSquare className="text-indigo-500" />
 
-              <p className="text-xs text-gray-500 truncate">
-                {conversationId}
-              </p>
+                  <p className="font-semibold text-slate-700 truncate">
+                    {conv.title || 'New Chat'}
+                  </p>
+                </div>
+
+                <p className="text-xs text-slate-400">
+                  {new Date(conv.createdAt).toLocaleDateString()}
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 mt-3">
+
+                <button
+                  onClick={() =>
+                    onRenameConversation(conv)
+                  }
+                  className="flex-1 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-sm flex items-center justify-center gap-1"
+                >
+                  <FiEdit2 size={14} />
+                  Rename
+                </button>
+
+                <button
+                  onClick={() =>
+                    onDeleteConversation(conv._id)
+                  }
+                  className="flex-1 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-red-500 text-sm flex items-center justify-center gap-1"
+                >
+                  <FiTrash2 size={14} />
+                  Delete
+                </button>
+              </div>
             </div>
-          </div>
+          ))}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-gray-200">
+        <div className="p-4 border-t border-slate-200">
           <button
-            onClick={onClearChat}
-            className="
-              w-full
-              flex items-center justify-center gap-2
-              px-4 py-3
-              rounded-xl
-              text-red-600
-              hover:bg-red-50
-              transition
-            "
+            onClick={onClearConversation}
+            className="w-full h-11 rounded-2xl text-red-500 hover:bg-red-50 flex items-center justify-center gap-2"
           >
-            <FiTrash2 size={18} />
+            <FiTrash2 />
             Clear Chat
           </button>
         </div>
-      </motion.div>
+      </div>
     </>
   );
 };
