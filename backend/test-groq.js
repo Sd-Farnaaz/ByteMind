@@ -8,24 +8,24 @@ const groq = new Groq({
 async function testGroq() {
   try {
     console.log('Testing Groq API...');
-    console.log('API Key:', process.env.GROQ_API_KEY?.substring(0, 10) + '...');
-    
+    const model = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+    console.log('Using model:', model);
+
     const completion = await groq.chat.completions.create({
       messages: [
         {
           role: 'user',
-          content: 'What is Java?'
+          content: 'What is ByteMind AI in one sentence?'
         }
       ],
-      model: 'llama-3.1-8b-instant',
+      model: model,
       temperature: 0.7,
     });
-    
+
     console.log('✅ Success!');
     console.log('Response:', completion.choices[0]?.message?.content);
   } catch (error) {
     console.error('❌ Error:', error.message);
-    console.error('Full error:', error);
   }
 }
 

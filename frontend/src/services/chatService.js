@@ -7,37 +7,35 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000,
+  timeout: 45000,
   withCredentials: true
 });
 
-// IMPORTANT: Add token to every request
+// Add JWT token to every request
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    console.log('Sending request to:', config.url, 'Token exists:', !!token);
-    
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      console.warn('No token found in localStorage');
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Add response interceptor for debugging
+// Response interceptor: only log out on genuine auth token invalidation
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    console.error('API Error:', error.response?.status, error.response?.data);
-    if (error.response?.status === 401) {
-      console.log('Authentication failed - redirecting to login');
+    const status = error.response?.status;
+    const isAuthRoute = error.config?.url?.includes('/auth/');
+    const isAuthTokenFailure = status === 401 && (
+      error.response?.data?.message?.toLowerCase().includes('not authorized') ||
+      error.response?.data?.message?.toLowerCase().includes('token')
+    );
+
+    if (isAuthTokenFailure || (status === 401 && isAuthRoute)) {
+      console.warn('Authentication token expired or invalid - redirecting to login');
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/';
@@ -55,11 +53,13 @@ export const sendMessage = async (message, conversationId = null) => {
     });
     return response.data;
   } catch (error) {
-    console.error('Send message error:', error);
-    if (error.response?.status === 401) {
-      return { success: false, error: 'Please login again' };
-    }
-    return { success: false, error: error.response?.data?.message || 'Failed to send message' };
+    console.error('Send message error:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to send message';
+    return {
+      success: false,
+      error: errorMessage,
+      conversationId: error.response?.data?.conversationId || conversationId
+    };
   }
 };
 
@@ -69,10 +69,7 @@ export const getConversations = async () => {
     const response = await api.get('/chat/conversations');
     return response.data;
   } catch (error) {
-    console.error('Failed to get conversations:', error);
-    if (error.response?.status === 401) {
-      return { success: false, error: 'Please login again' };
-    }
+    console.error('Failed to get conversations:', error.response?.data || error.message);
     return { success: false, conversations: [] };
   }
 };
@@ -83,7 +80,7 @@ export const getConversationMessages = async (conversationId) => {
     const response = await api.get(`/chat/conversation/${conversationId}`);
     return response.data;
   } catch (error) {
-    console.error('Failed to get messages:', error);
+    console.error('Failed to get messages:', error.response?.data || error.message);
     return { success: false, messages: [] };
   }
 };
@@ -96,8 +93,8 @@ export const clearConversation = async (conversationId) => {
     });
     return response.data;
   } catch (error) {
-    console.error('Failed to clear conversation:', error);
-    return { success: false, error: 'Failed to clear conversation' };
+    console.error('Failed to clear conversation:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data?.message || 'Failed to clear conversation' };
   }
 };
 
@@ -109,8 +106,8 @@ export const deleteConversation = async (conversationId) => {
     });
     return response.data;
   } catch (error) {
-    console.error('Failed to delete conversation:', error);
-    return { success: false, error: 'Failed to delete conversation' };
+    console.error('Failed to delete conversation:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data?.message || 'Failed to delete conversation' };
   }
 };
 
@@ -123,12 +120,11 @@ export const renameConversation = async (conversationId, title) => {
     });
     return response.data;
   } catch (error) {
-    console.error('Failed to rename conversation:', error);
-    return { success: false, error: 'Failed to rename conversation' };
+    console.error('Failed to rename conversation:', error.response?.data || error.message);
+    return { success: false, error: error.response?.data?.message || 'Failed to rename conversation' };
   }
 };
 
-// Get single conversation (legacy support)
 export const getConversation = async (conversationId) => {
   return getConversationMessages(conversationId);
 };

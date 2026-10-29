@@ -1,14 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-
 import {
   FiMenu,
-  FiSend,
   FiLogOut,
-  FiMic,
-  FiUser
+  FiPlus,
+  FiTrash2,
+  FiZap
 } from 'react-icons/fi';
-
+import toast from 'react-hot-toast';
 import Sidebar from './Sidebar';
+import WelcomeScreen from './WelcomeScreen';
+import ChatMessage from './ChatMessage';
+import ChatInput from './ChatInput';
+import ByteMindMascot from './ByteMindMascot';
 
 import {
   sendMessage,
@@ -20,21 +23,14 @@ import {
 } from '../services/chatService';
 
 const ChatInterface = ({ user, setUser }) => {
-
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  const [message, setMessage] = useState('');
-
   const [messages, setMessages] = useState([]);
-
   const [loading, setLoading] = useState(false);
-
   const [conversationId, setConversationId] = useState(null);
-
   const [conversations, setConversations] = useState([]);
-
   const messagesEndRef = useRef(null);
+  const chatScrollContainerRef = useRef(null);
 
   useEffect(() => {
     loadConversations();
@@ -42,137 +38,178 @@ const ChatInterface = ({ user, setUser }) => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, loading]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth'
-    });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   const loadConversations = async () => {
-
     const data = await getConversations();
-
     if (data.success) {
       setConversations(data.conversations || []);
     }
   };
 
   const loadMessages = async (conversation) => {
-
     setConversationId(conversation.conversationId);
-
-    const data = await getConversationMessages(
-      conversation.conversationId
-    );
-
+    const data = await getConversationMessages(conversation.conversationId);
     if (data.success) {
       setMessages(data.messages || []);
+    } else {
+      toast.error('Failed to load conversation messages');
     }
   };
 
-  const handleSend = async () => {
+  const handleSendMessage = async (textToSend) => {
+    if (!textToSend || !textToSend.trim() || loading) return;
 
-    if (!message.trim()) return;
+    const trimmed = textToSend.trim();
 
-    const tempMessage = message;
+    // Optimistically add user message
+    const userMsg = {
+      role: 'user',
+      content: trimmed,
+      timestamp: new Date().toISOString()
+    };
 
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: 'user',
-        content: tempMessage
-      }
-    ]);
-
-    setMessage('');
-
+    setMessages((prev) => [...prev, userMsg]);
     setLoading(true);
 
     try {
-
-      const response = await sendMessage(
-        tempMessage,
-        conversationId
-      );
+      const response = await sendMessage(trimmed, conversationId);
 
       if (response.success) {
+        const assistantMsg = {
+          role: 'assistant',
+          content: response.message || response.reply,
+          timestamp: response.timestamp || new Date().toISOString()
+        };
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: 'assistant',
-            content:
-              response.message ||
-              response.reply
-          }
-        ]);
+        setMessages((prev) => [...prev, assistantMsg]);
 
         if (response.conversationId) {
-          setConversationId(
-            response.conversationId
-          );
+          setConversationId(response.conversationId);
         }
 
         loadConversations();
+      } else {
+        const errorText = response.error || response.message || 'An error occurred with the AI provider.';
+        const errorMsg = {
+          role: 'assistant',
+          content: errorText,
+          isError: true,
+          timestamp: new Date().toISOString()
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+        toast.error(errorText);
       }
-
     } catch (err) {
-
-      console.log(err);
-
+      console.error('Chat error:', err);
+      const errorMsg = {
+        role: 'assistant',
+        content: err.message || 'Network error communicating with ByteMind AI service.',
+        isError: true,
+        timestamp: new Date().toISOString()
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+      toast.error('Failed to get a response');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    setLoading(false);
+  // Retry the last message
+  const handleRetry = () => {
+    // Find the last user message to resend
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') {
+        const lastUserPrompt = messages[i].content;
+        // Strip trailing error assistant messages
+        setMessages((prev) => prev.slice(0, i + 1));
+        // Resend
+        handleSendMessage(lastUserPrompt);
+        return;
+      }
+    }
+  };
+
+  const handleNewChat = () => {
+    setMessages([]);
+    setConversationId(null);
   };
 
   const handleDeleteConversation = async (id) => {
-
-    await deleteConversation(id);
-
-    setMessages([]);
-
-    setConversationId(null);
-
-    loadConversations();
+    try {
+      const res = await deleteConversation(id);
+      if (res.success) {
+        toast.success('Conversation deleted');
+        if (conversationId === id) {
+          setMessages([]);
+          setConversationId(null);
+        }
+        loadConversations();
+      } else {
+        toast.error(res.error || 'Failed to delete');
+      }
+    } catch (err) {
+      toast.error('Failed to delete conversation');
+    }
   };
 
   const handleClearConversation = async () => {
+    if (!conversationId) {
+      setMessages([]);
+      return;
+    }
 
-    if (!conversationId) return;
-
-    await clearConversation(conversationId);
-
-    setMessages([]);
+    try {
+      const res = await clearConversation(conversationId);
+      if (res.success) {
+        setMessages([]);
+        toast.success('Conversation cleared');
+      } else {
+        toast.error(res.error || 'Failed to clear');
+      }
+    } catch (err) {
+      toast.error('Failed to clear conversation');
+    }
   };
 
-  const handleRenameConversation = async (
-    conversationId,
-    newTitle
-  ) => {
+  const handleRenameConversation = async (convId, newTitle) => {
     if (!newTitle || !newTitle.trim()) return;
 
-    await renameConversation(
-      conversationId,
-      newTitle.trim()
-    );
-
-    loadConversations();
+    try {
+      const res = await renameConversation(convId, newTitle.trim());
+      if (res.success) {
+        toast.success('Conversation renamed');
+        loadConversations();
+      } else {
+        toast.error(res.error || 'Failed to rename');
+      }
+    } catch (err) {
+      toast.error('Failed to rename conversation');
+    }
   };
 
+  // Get current active conversation title if any
+  const currentConv = conversations.find((c) => c.conversationId === conversationId);
+  const activeTitle = currentConv ? currentConv.title : (messages.length > 0 ? 'Current Chat' : 'New Chat');
+
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-100">
+    <div className="flex h-screen overflow-hidden dreamscape-bg relative">
+      {/* Dreamy Ambient Depth Glows in Background */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-violet-300/20 filter blur-[90px] pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-[420px] h-[420px] rounded-full bg-sky-300/20 filter blur-[100px] pointer-events-none" />
+      <div className="absolute top-1/2 right-10 w-72 h-72 rounded-full bg-indigo-300/15 filter blur-[80px] pointer-events-none" />
 
       {/* SIDEBAR */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
-        onNewChat={() => {
-          setMessages([]);
-          setConversationId(null);
-          setSidebarOpen(false);
-        }}
+        onNewChat={handleNewChat}
         conversations={conversations}
         currentConversationId={conversationId}
         onSelectConversation={loadMessages}
@@ -184,14 +221,12 @@ const ChatInterface = ({ user, setUser }) => {
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
       />
 
-      {/* MAIN */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-
-        {/* HEADER */}
-        <div className="h-16 bg-white border-b border-slate-200 px-4 flex items-center justify-between shrink-0">
-
-          <div className="flex items-center gap-4">
-
+      {/* MAIN CHAT AREA */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
+        {/* HEADER BAR */}
+        <header className="h-16 glass-panel border-b border-white/60 px-4 sm:px-6 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Sidebar toggle for mobile & desktop */}
             <button
               onClick={() => {
                 if (window.innerWidth < 768) {
@@ -202,100 +237,95 @@ const ChatInterface = ({ user, setUser }) => {
               }}
               className={`${
                 sidebarCollapsed ? 'md:flex' : 'md:hidden'
-              } w-10 h-10 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-all duration-200`}
+              } w-9 h-9 rounded-xl glass-card hover:bg-white text-slate-600 flex items-center justify-center transition-all shadow-xs`}
+              aria-label="Open sidebar"
             >
-              <FiMenu size={22} className="text-slate-600" />
+              <FiMenu size={18} />
             </button>
 
-            <div>
-              <h1 className="text-xl font-bold text-slate-800">
-                ByteMind
-              </h1>
-
-              <p className="text-sm text-green-500">
-                Online
+            {/* Conversation Title & Status */}
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h1 className="text-sm sm:text-base font-bold text-slate-800 truncate">
+                  {activeTitle}
+                </h1>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100/70 text-violet-700 text-[10px] font-semibold border border-violet-200/60">
+                  <FiZap size={10} />
+                  ByteMind 2.0
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 truncate">
+                Powered by Groq Cloud AI
               </p>
             </div>
           </div>
 
-          <button
-            onClick={setUser}
-            className="w-10 h-10 rounded-xl bg-red-50 text-red-500 flex items-center justify-center"
-          >
-            <FiLogOut />
-          </button>
-        </div>
+          {/* Quick Header Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleNewChat}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card hover:bg-white text-slate-700 text-xs font-medium transition-all shadow-xs border border-white/80"
+              title="Start a new chat"
+            >
+              <FiPlus size={14} className="text-violet-600" />
+              <span>New</span>
+            </button>
 
-        {/* CHAT */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+            {messages.length > 0 && (
+              <button
+                onClick={handleClearConversation}
+                className="w-9 h-9 rounded-xl glass-card hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors shadow-xs border border-white/80"
+                title="Clear current messages"
+              >
+                <FiTrash2 size={15} />
+              </button>
+            )}
 
+            <button
+              onClick={setUser}
+              className="w-9 h-9 rounded-xl glass-card hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors shadow-xs border border-white/80"
+              title="Log Out"
+            >
+              <FiLogOut size={16} />
+            </button>
+          </div>
+        </header>
+
+        {/* MESSAGES SCROLL VIEW */}
+        <div
+          ref={chatScrollContainerRef}
+          className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 scrollbar-glass flex flex-col"
+        >
           {messages.length === 0 ? (
-
-            <div className="h-full flex items-center justify-center">
-
-              <div className="text-center">
-
-                <div className="text-6xl mb-6">
-                  🤖
-                </div>
-
-                <h2 className="text-4xl font-bold text-slate-700 mb-4">
-                  Welcome, {user?.name}!
-                </h2>
-
-                <p className="text-slate-500 text-lg">
-                  Ask me anything and start chatting with AI.
-                </p>
-              </div>
-            </div>
-
+            <WelcomeScreen
+              userName={user?.name}
+              onSelectPrompt={(prompt) => handleSendMessage(prompt)}
+            />
           ) : (
-
-            <div className="max-w-4xl mx-auto space-y-6">
-
+            <div className="max-w-4xl mx-auto w-full space-y-2 flex-1">
               {messages.map((msg, index) => (
-
-                <div
+                <ChatMessage
                   key={index}
-                  className={`flex ${
-                    msg.role === 'user'
-                      ? 'justify-end'
-                      : 'justify-start'
-                  }`}
-                >
-
-                  <div
-                    className={`
-                      max-w-[85%]
-                      rounded-3xl
-                      px-5 py-4
-                      ${
-                        msg.role === 'user'
-                          ? 'bg-indigo-500 text-white'
-                          : 'bg-white border border-slate-200 text-slate-700'
-                      }
-                    `}
-                  >
-
-                    <div className="flex gap-3">
-
-                      <div>
-                        {msg.role === 'user'
-                          ? <FiUser />
-                          : '🤖'}
-                      </div>
-
-                      <p className="leading-7 whitespace-pre-wrap">
-                        {msg.content}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+                  message={msg}
+                  onRetry={handleRetry}
+                  isLast={index === messages.length - 1}
+                />
               ))}
 
+              {/* Typing / Loading Glass State */}
               {loading && (
-                <div className="bg-white border border-slate-200 rounded-3xl px-5 py-4 inline-block">
-                  Thinking...
+                <div className="flex items-start gap-3 mb-6 animate-fade-in">
+                  <div className="w-8 h-8 rounded-full bg-white/90 border border-violet-200/80 flex items-center justify-center shadow-sm shrink-0">
+                    <ByteMindMascot size="xs" isThinking={true} />
+                  </div>
+                  <div className="glass-card rounded-3xl rounded-tl-sm px-5 py-3.5 border border-white/80 shadow-bubble-ai flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-violet-600 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-sky-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </div>
+                    <span className="text-xs font-medium text-slate-500">ByteMind is thinking...</span>
+                  </div>
                 </div>
               )}
 
@@ -304,39 +334,17 @@ const ChatInterface = ({ user, setUser }) => {
           )}
         </div>
 
-        {/* INPUT */}
-        <div className="border-t border-slate-200 bg-white p-4 shrink-0">
-
+        {/* FLOATING CHAT COMPOSER */}
+        <div className="p-4 sm:p-5 shrink-0 relative z-20">
           <div className="max-w-4xl mx-auto">
-
-            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-3xl p-3">
-
-              <textarea
-                rows="1"
-                value={message}
-                onChange={(e) =>
-                  setMessage(e.target.value)
-                }
-                placeholder="Ask anything..."
-                className="flex-1 resize-none bg-transparent outline-none"
-              />
-
-              <button className="w-12 h-12 rounded-2xl bg-slate-200 flex items-center justify-center">
-                <FiMic />
-              </button>
-
-              <button
-                onClick={handleSend}
-                disabled={loading}
-                className="px-6 h-12 rounded-2xl bg-indigo-500 hover:bg-indigo-600 text-white flex items-center gap-2 font-semibold"
-              >
-                <FiSend />
-                Send
-              </button>
-            </div>
+            <ChatInput
+              onSendMessage={handleSendMessage}
+              disabled={loading}
+              placeholder="Ask ByteMind anything or paste code..."
+            />
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };

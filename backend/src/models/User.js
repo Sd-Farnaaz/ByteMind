@@ -25,6 +25,14 @@ const userSchema = new mongoose.Schema({
     minlength: 6,
     select: false
   },
+  conversations: [
+    {
+      conversationId: String,
+      title: String,
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    }
+  ],
   createdAt: {
     type: Date,
     default: Date.now

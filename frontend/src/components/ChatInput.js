@@ -1,20 +1,23 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FiSend, FiMic } from 'react-icons/fi';
+import { FiSend, FiMic, FiMicOff } from 'react-icons/fi';
 
-const ChatInput = ({ onSendMessage, disabled }) => {
+const ChatInput = ({ onSendMessage, disabled, placeholder = 'Ask ByteMind anything...' }) => {
   const [message, setMessage] = useState('');
   const [isRecording, setIsRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(false);
   const textareaRef = useRef(null);
   const recognitionRef = useRef(null);
 
+  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 140)}px`;
+      const scrollHeight = textareaRef.current.scrollHeight;
+      textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, 44), 160)}px`;
     }
   }, [message]);
 
+  // Setup Web Speech API if supported
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -22,34 +25,54 @@ const ChatInput = ({ onSendMessage, disabled }) => {
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.continuous = false;
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+      recognition.continuous = false;
 
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setMessage(prev => `${prev}${prev ? ' ' : ''}${transcript}`);
+      recognition.onresult = (event) => {
+        const transcript = event.results[0]?.[0]?.transcript;
+        if (transcript) {
+          setMessage((prev) => `${prev}${prev ? ' ' : ''}${transcript}`);
+        }
+        setIsRecording(false);
+      };
+
+      recognition.onerror = () => {
+        setIsRecording(false);
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+      setSpeechSupported(true);
+    } catch (e) {
+      console.warn('Speech recognition not available:', e);
+      setSpeechSupported(false);
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (_) {}
+      }
     };
-
-    recognition.onerror = () => {
-      setIsRecording(false);
-    };
-
-    recognition.onend = () => {
-      setIsRecording(false);
-    };
-
-    recognitionRef.current = recognition;
-    setSpeechSupported(true);
   }, []);
 
   const handleSubmit = (e) => {
-    e.preventDefault();
-    if (message.trim() && !disabled) {
-      onSendMessage(message);
-      setMessage('');
+    if (e) e.preventDefault();
+    const trimmed = message.trim();
+    if (!trimmed || disabled) return;
+
+    onSendMessage(trimmed);
+    setMessage('');
+
+    if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
   };
@@ -57,91 +80,84 @@ const ChatInput = ({ onSendMessage, disabled }) => {
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      handleSubmit(e);
+      handleSubmit();
     }
   };
 
-  const handleVoiceInput = () => {
+  const toggleVoiceInput = () => {
     if (!speechSupported || !recognitionRef.current) return;
 
     if (isRecording) {
-      recognitionRef.current.stop();
-      return;
+      try {
+        recognitionRef.current.stop();
+      } catch (_) {}
+      setIsRecording(false);
+    } else {
+      try {
+        recognitionRef.current.start();
+        setIsRecording(true);
+      } catch (err) {
+        console.error('Failed to start speech recognition:', err);
+        setIsRecording(false);
+      }
     }
-
-    setIsRecording(true);
-    recognitionRef.current.start();
   };
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-[30px] border border-slate-200 bg-white px-5 py-5 shadow-[0_18px_45px_-22px_rgba(15,23,42,0.18)] transition-all duration-200">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Send a message</div>
-            <div className="text-xs text-slate-500">Type your prompt and press Send.</div>
-          </div>
-          <div className="text-xs text-slate-500">Shift + Enter for a new line</div>
-        </div>
+    <form
+      onSubmit={handleSubmit}
+      className="glass-input rounded-3xl p-2 sm:p-3 transition-all duration-200"
+    >
+      <div className="flex items-end gap-2">
+        {/* Multiline Textarea */}
+        <textarea
+          ref={textareaRef}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          rows={1}
+          disabled={disabled}
+          className="flex-1 resize-none bg-transparent px-3 py-2 text-slate-800 placeholder-slate-400 text-sm sm:text-base outline-none min-h-[44px] max-h-[160px] leading-relaxed scrollbar-glass"
+          aria-label="Type your message"
+        />
 
-        <div className="relative flex items-end">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask a question or tell me what you need help with..."
-            rows={1}
-            disabled={disabled}
-            className="flex-1 resize-none rounded-[26px] border border-slate-300 bg-slate-50 px-5 py-4 pr-36 text-slate-900 placeholder-slate-400 outline-none transition duration-200 focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-500/15"
-            style={{ minHeight: '64px', maxHeight: '180px' }}
-          />
-
-          <div className="absolute right-3 bottom-3 flex items-center gap-2">
+        {/* Action Controls */}
+        <div className="flex items-center gap-1.5 shrink-0 pb-1 pr-1">
+          {/* Microphone button (visible only if browser supports it) */}
+          {speechSupported && (
             <button
               type="button"
-              onClick={handleVoiceInput}
-              disabled={!speechSupported}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-slate-200 bg-slate-100 text-slate-600 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label={isRecording ? 'Stop voice input' : 'Voice input'}
+              onClick={toggleVoiceInput}
+              disabled={disabled}
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+                isRecording
+                  ? 'bg-rose-500 text-white animate-pulse shadow-md shadow-rose-500/30'
+                  : 'bg-slate-100/80 hover:bg-slate-200 text-slate-600 border border-slate-200/60'
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              aria-label={isRecording ? 'Stop voice recording' : 'Start voice input'}
+              title={isRecording ? 'Listening...' : 'Voice input'}
             >
-              <FiMic size={18} className={isRecording ? 'text-primary-600' : ''} />
+              {isRecording ? <FiMicOff size={17} /> : <FiMic size={17} />}
             </button>
-            <button
-              type="submit"
-              disabled={!message.trim() || disabled}
-              className="inline-flex h-12 items-center gap-2 rounded-2xl bg-primary-700 px-5 text-sm font-semibold text-white shadow-xl shadow-primary-600/20 transition hover:bg-primary-800 disabled:cursor-not-allowed disabled:opacity-60"
-              aria-label="Send message"
-            >
-              <FiSend size={18} />
-              <span>Send</span>
-            </button>
-          </div>
-        </div>
+          )}
 
-        <div className="grid gap-2 sm:flex sm:flex-wrap text-sm text-slate-600">
+          {/* Send Button */}
           <button
-            type="button"
-            className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 font-medium transition hover:border-slate-300 hover:bg-slate-50"
-            onClick={() => setMessage('What is the best way to learn React?')}
+            type="submit"
+            disabled={!message.trim() || disabled}
+            className="h-10 px-4 sm:px-5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 text-white font-medium text-sm flex items-center gap-2 shadow-md shadow-indigo-500/25 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none hover:scale-[1.02] active:scale-[0.98]"
+            aria-label="Send message"
           >
-            Best way to learn React
-          </button>
-          <button
-            type="button"
-            className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 font-medium transition hover:border-slate-300 hover:bg-slate-50"
-            onClick={() => setMessage('Can you explain asynchronous JavaScript?')}
-          >
-            Asynchronous JavaScript
-          </button>
-          <button
-            type="button"
-            className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 font-medium transition hover:border-slate-300 hover:bg-slate-50"
-            onClick={() => setMessage('Give me a quick coding tip.')}
-          >
-            Quick coding tip
+            <FiSend size={15} />
+            <span className="hidden sm:inline">Send</span>
           </button>
         </div>
+      </div>
+
+      <div className="flex items-center justify-between px-3 pt-1 text-[11px] text-slate-400">
+        <span>Press <kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono">Enter</kbd> to send</span>
+        <span><kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono">Shift + Enter</kbd> for newline</span>
       </div>
     </form>
   );

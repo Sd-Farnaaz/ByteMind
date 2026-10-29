@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import Auth from './components/Auth';
 import ChatInterface from './components/ChatInterface';
+import ByteMindMascot from './components/ByteMindMascot';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -11,15 +12,11 @@ function App() {
     // Check if user is already logged in
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    
-    console.log('App loaded - Token exists:', !!token);
-    console.log('Saved user:', savedUser);
-    
+
     if (token && savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
-        console.log('User restored from localStorage:', parsedUser);
       } catch (error) {
         console.error('Failed to parse user:', error);
         localStorage.removeItem('token');
@@ -30,12 +27,10 @@ function App() {
   }, []);
 
   const handleLogin = (userData) => {
-    console.log('Login successful, setting user:', userData);
     setUser(userData);
   };
 
   const handleLogout = () => {
-    console.log('Logging out');
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     setUser(null);
@@ -43,20 +38,49 @@ function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+      <div className="min-h-screen flex items-center justify-center dreamscape-bg">
+        <div className="text-center flex flex-col items-center">
+          <ByteMindMascot size="md" isThinking={true} />
+          <p className="mt-4 text-slate-600 text-sm font-semibold tracking-wide">
+            Initializing ByteMind AI...
+          </p>
         </div>
       </div>
     );
   }
 
-  console.log('App render - User exists:', !!user);
-
   return (
     <>
-      <Toaster position="top-right" />
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: 'rgba(255, 255, 255, 0.92)',
+            backdropFilter: 'blur(16px)',
+            WebkitBackdropFilter: 'blur(16px)',
+            border: '1px solid rgba(255, 255, 255, 0.85)',
+            borderRadius: '18px',
+            boxShadow: '0 12px 32px -4px rgba(124, 58, 237, 0.16)',
+            color: '#1e293b',
+            fontSize: '13px',
+            fontWeight: 500,
+            padding: '12px 18px',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#ffffff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#f43f5e',
+              secondary: '#ffffff',
+            },
+          },
+        }}
+      />
       {user ? (
         <ChatInterface user={user} setUser={handleLogout} />
       ) : (
