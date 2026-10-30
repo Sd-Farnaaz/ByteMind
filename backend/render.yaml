@@ -6,9 +6,11 @@ services:
     buildCommand: cd backend && npm install
     startCommand: cd backend && npm start
     envVars:
+      - key: MONGODB_URI
       - key: MONGO_URI
       - key: JWT_SECRET
       - key: GROQ_API_KEY
+      - key: GROQ_MODEL
       - key: FRONTEND_URL
   - type: static
     name: bytemind-frontend

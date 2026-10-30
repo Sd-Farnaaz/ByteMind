@@ -199,7 +199,7 @@ const ChatInterface = ({ user, setUser }) => {
   const activeTitle = currentConv ? currentConv.title : (messages.length > 0 ? 'Current Chat' : 'New Chat');
 
   return (
-    <div className="flex h-screen overflow-hidden dreamscape-bg relative">
+    <div className="flex h-full h-[100dvh] overflow-hidden dreamscape-bg relative">
       {/* Dreamy Ambient Depth Glows in Background */}
       <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-violet-300/20 filter blur-[90px] pointer-events-none" />
       <div className="absolute bottom-10 right-1/4 w-[420px] h-[420px] rounded-full bg-sky-300/20 filter blur-[100px] pointer-events-none" />
@@ -222,10 +222,10 @@ const ChatInterface = ({ user, setUser }) => {
       />
 
       {/* MAIN CHAT AREA */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative z-10">
+      <main className="flex-1 flex flex-col h-full h-[100dvh] overflow-hidden relative z-10">
         {/* HEADER BAR */}
-        <header className="h-16 glass-panel border-b border-white/60 px-4 sm:px-6 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3 min-w-0">
+        <header className="h-14 sm:h-16 glass-panel border-b border-white/60 px-3 sm:px-6 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             {/* Sidebar toggle for mobile & desktop */}
             <button
               onClick={() => {
@@ -237,56 +237,56 @@ const ChatInterface = ({ user, setUser }) => {
               }}
               className={`${
                 sidebarCollapsed ? 'md:flex' : 'md:hidden'
-              } w-9 h-9 rounded-xl glass-card hover:bg-white text-slate-600 flex items-center justify-center transition-all shadow-xs`}
+              } w-8 h-8 sm:w-9 sm:h-9 rounded-xl glass-card hover:bg-white text-slate-600 flex items-center justify-center transition-all shadow-xs`}
               aria-label="Open sidebar"
             >
-              <FiMenu size={18} />
+              <FiMenu size={17} />
             </button>
 
             {/* Conversation Title & Status */}
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-sm sm:text-base font-bold text-slate-800 truncate">
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <h1 className="text-xs sm:text-base font-bold text-slate-800 truncate max-w-[140px] sm:max-w-none">
                   {activeTitle}
                 </h1>
-                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100/70 text-violet-700 text-[10px] font-semibold border border-violet-200/60">
-                  <FiZap size={10} />
+                <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-violet-100/70 text-violet-700 text-[9px] sm:text-[10px] font-semibold border border-violet-200/60">
+                  <FiZap size={9} />
                   ByteMind 2.0
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
                 Powered by Groq Cloud AI
               </p>
             </div>
           </div>
 
           {/* Quick Header Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               onClick={handleNewChat}
-              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl glass-card hover:bg-white text-slate-700 text-xs font-medium transition-all shadow-xs border border-white/80"
+              className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl glass-card hover:bg-white text-slate-700 text-xs font-medium transition-all shadow-xs border border-white/80"
               title="Start a new chat"
             >
               <FiPlus size={14} className="text-violet-600" />
-              <span>New</span>
+              <span className="hidden sm:inline">New</span>
             </button>
 
             {messages.length > 0 && (
               <button
                 onClick={handleClearConversation}
-                className="w-9 h-9 rounded-xl glass-card hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors shadow-xs border border-white/80"
+                className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl glass-card hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors shadow-xs border border-white/80"
                 title="Clear current messages"
               >
-                <FiTrash2 size={15} />
+                <FiTrash2 size={14} />
               </button>
             )}
 
             <button
               onClick={setUser}
-              className="w-9 h-9 rounded-xl glass-card hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors shadow-xs border border-white/80"
+              className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl glass-card hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors shadow-xs border border-white/80"
               title="Log Out"
             >
-              <FiLogOut size={16} />
+              <FiLogOut size={15} />
             </button>
           </div>
         </header>
@@ -294,7 +294,7 @@ const ChatInterface = ({ user, setUser }) => {
         {/* MESSAGES SCROLL VIEW */}
         <div
           ref={chatScrollContainerRef}
-          className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 scrollbar-glass flex flex-col"
+          className="flex-1 overflow-y-auto px-3 sm:px-6 py-3 sm:py-6 scrollbar-glass flex flex-col overscroll-contain"
         >
           {messages.length === 0 ? (
             <WelcomeScreen
@@ -335,12 +335,12 @@ const ChatInterface = ({ user, setUser }) => {
         </div>
 
         {/* FLOATING CHAT COMPOSER */}
-        <div className="p-4 sm:p-5 shrink-0 relative z-20">
+        <div className="p-2 sm:p-5 pb-3 sm:pb-5 shrink-0 relative z-20">
           <div className="max-w-4xl mx-auto">
             <ChatInput
               onSendMessage={handleSendMessage}
               disabled={loading}
-              placeholder="Ask ByteMind anything or paste code..."
+              placeholder="Ask ByteMind anything..."
             />
           </div>
         </div>

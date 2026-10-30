@@ -76,50 +76,71 @@ const sendMessage = async (req, res) => {
     }));
 
     if (!groq) {
-      // Save user message so state is preserved
       conversation.updatedAt = new Date();
       await conversation.save();
 
       return res.status(500).json({
         success: false,
-        message: 'Groq AI service is not initialized on server. Please check your GROQ_API_KEY configuration.',
+        message: 'Groq AI service is not initialized on server. Please check your GROQ_API_KEY in Render Dashboard Environment.',
         conversationId: conversation.conversationId
       });
     }
 
-    // Call Groq API
+    // Candidate models to attempt in order if a specific model is missing or deprecated
+    const requestedModel = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+    const candidateModels = [
+      requestedModel,
+      'openai/gpt-oss-20b',
+      'qwen/qwen3.8-27b',
+      'allam-2-7b',
+      'llama-3.1-8b-instant'
+    ];
+    const uniqueModels = [...new Set(candidateModels)];
+
     let aiResponse = null;
-    const modelToUse = process.env.GROQ_MODEL || 'openai/gpt-oss-20b';
+    let lastError = null;
 
-    try {
-      console.log(`🔄 Calling Groq API (${modelToUse})...`);
+    for (const modelToTry of uniqueModels) {
+      try {
+        console.log(`🔄 Calling Groq API (${modelToTry})...`);
 
-      const completion = await groq.chat.completions.create({
-        messages: [
-          {
-            role: 'system',
-            content: SYSTEM_PROMPT || 'You are ByteMind AI, a helpful, friendly, and knowledgeable assistant.'
-          },
-          ...chatHistory
-        ],
-        model: modelToUse,
-        temperature: 0.7,
-        max_tokens: 1000,
-      });
+        const completion = await groq.chat.completions.create({
+          messages: [
+            {
+              role: 'system',
+              content: SYSTEM_PROMPT || 'You are ByteMind AI, a helpful, friendly, and knowledgeable assistant.'
+            },
+            ...chatHistory
+          ],
+          model: modelToTry,
+          temperature: 0.7,
+          max_tokens: 1000,
+        });
 
-      aiResponse = completion.choices[0]?.message?.content;
-      console.log('✅ Groq API response received');
-    } catch (apiError) {
-      console.error('❌ Groq API Error:', apiError.message, 'Status:', apiError.status);
+        aiResponse = completion.choices[0]?.message?.content;
+        console.log(`✅ Groq API response received using model: ${modelToTry}`);
+        break; // Success, exit loop
+      } catch (err) {
+        lastError = err;
+        console.warn(`⚠️ Model ${modelToTry} failed: ${err.message}`);
+        // If 401 unauthorized (key invalid), do not retry other models as key is invalid for all
+        if (err.status === 401) {
+          break;
+        }
+      }
+    }
+
+    if (!aiResponse) {
+      console.error('❌ All Groq attempts failed:', lastError?.message, 'Status:', lastError?.status);
 
       // Save user message to database even when API fails
       conversation.updatedAt = new Date();
       await conversation.save();
 
-      const isKeyError = apiError.status === 401;
+      const isKeyError = lastError?.status === 401;
       const errorMsg = isKeyError
-        ? 'Invalid or expired Groq API Key. Please verify your GROQ_API_KEY credentials.'
-        : (apiError.message || 'AI service encountered an error generating response.');
+        ? 'Invalid or expired Groq API Key. Please update your GROQ_API_KEY in Render Dashboard -> Environment.'
+        : (lastError?.message || 'AI service encountered an error generating response.');
 
       return res.status(502).json({
         success: false,

@@ -12,20 +12,24 @@ const ByteMindMascot = ({
   className = '',
   interactive = false
 }) => {
+  const isResponsive = size === 'responsive';
+
   const sizeMap = {
-    xs: { width: 36, height: 36 },
-    sm: { width: 56, height: 56 },
-    md: { width: 104, height: 104 },
-    lg: { width: 140, height: 140 },
-    xl: { width: 180, height: 180 }
+    xs: { width: 34, height: 34 },
+    sm: { width: 52, height: 52 },
+    md: { width: 88, height: 88 },
+    lg: { width: 124, height: 124 },
+    xl: { width: 160, height: 160 }
   };
 
-  const { width, height } = sizeMap[size] || sizeMap.md;
+  const dims = sizeMap[size] || sizeMap.md;
 
   return (
     <div
-      className={`relative inline-flex items-center justify-center select-none ${className}`}
-      style={{ width, height }}
+      className={`relative inline-flex items-center justify-center select-none ${
+        isResponsive ? 'w-16 h-16 sm:w-28 sm:h-28' : ''
+      } ${className}`}
+      style={!isResponsive ? { width: dims.width, height: dims.height } : undefined}
       aria-label="ByteMind AI Mascot"
       role="img"
     >
@@ -43,14 +47,14 @@ const ByteMindMascot = ({
         }}
         style={{
           background: 'radial-gradient(circle, rgba(167, 139, 250, 0.5) 0%, rgba(129, 140, 248, 0.25) 45%, transparent 70%)',
-          filter: 'blur(12px)'
+          filter: 'blur(10px)'
         }}
       />
 
       {/* Floating Mascot Body Container */}
       <motion.div
         animate={{
-          y: isThinking ? [-3, 3, -3] : [0, -7, 0],
+          y: isThinking ? [-2, 2, -2] : [0, -6, 0],
           rotate: isThinking ? [-1.5, 1.5, -1.5] : [0, 1, 0]
         }}
         transition={{
@@ -65,7 +69,7 @@ const ByteMindMascot = ({
           viewBox="0 0 120 120"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full drop-shadow-[0_10px_20px_rgba(124,58,237,0.22)]"
+          className="w-full h-full drop-shadow-[0_8px_16px_rgba(124,58,237,0.2)]"
         >
           <defs>
             {/* Outer Head Shell Gradient */}
@@ -201,4 +205,3 @@ const ByteMindMascot = ({
 };
 
 export default ByteMindMascot;
-

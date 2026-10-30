@@ -13,7 +13,7 @@ const ChatInput = ({ onSendMessage, disabled, placeholder = 'Ask ByteMind anythi
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
       const scrollHeight = textareaRef.current.scrollHeight;
-      textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, 44), 160)}px`;
+      textareaRef.current.style.height = `${Math.min(Math.max(scrollHeight, 40), 140)}px`;
     }
   }, [message]);
 
@@ -103,34 +103,42 @@ const ChatInput = ({ onSendMessage, disabled, placeholder = 'Ask ByteMind anythi
     }
   };
 
+  const handleFocus = () => {
+    // When virtual keyboard opens on mobile, ensure input stays in view
+    setTimeout(() => {
+      textareaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 250);
+  };
+
   return (
     <form
       onSubmit={handleSubmit}
-      className="glass-input rounded-3xl p-2 sm:p-3 transition-all duration-200"
+      className="glass-input rounded-2xl sm:rounded-3xl p-1.5 sm:p-3 transition-all duration-200"
     >
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-1.5 sm:gap-2">
         {/* Multiline Textarea */}
         <textarea
           ref={textareaRef}
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
+          onFocus={handleFocus}
           placeholder={placeholder}
           rows={1}
           disabled={disabled}
-          className="flex-1 resize-none bg-transparent px-3 py-2 text-slate-800 placeholder-slate-400 text-sm sm:text-base outline-none min-h-[44px] max-h-[160px] leading-relaxed scrollbar-glass"
+          className="flex-1 resize-none bg-transparent px-2.5 sm:px-3 py-1.5 sm:py-2 text-slate-800 placeholder-slate-400 text-xs sm:text-base outline-none min-h-[38px] sm:min-h-[44px] max-h-[140px] leading-relaxed scrollbar-glass"
           aria-label="Type your message"
         />
 
         {/* Action Controls */}
-        <div className="flex items-center gap-1.5 shrink-0 pb-1 pr-1">
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 pb-0.5 sm:pb-1 pr-0.5 sm:pr-1">
           {/* Microphone button (visible only if browser supports it) */}
           {speechSupported && (
             <button
               type="button"
               onClick={toggleVoiceInput}
               disabled={disabled}
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center transition-all ${
+              className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center transition-all ${
                 isRecording
                   ? 'bg-rose-500 text-white animate-pulse shadow-md shadow-rose-500/30'
                   : 'bg-slate-100/80 hover:bg-slate-200 text-slate-600 border border-slate-200/60'
@@ -138,7 +146,7 @@ const ChatInput = ({ onSendMessage, disabled, placeholder = 'Ask ByteMind anythi
               aria-label={isRecording ? 'Stop voice recording' : 'Start voice input'}
               title={isRecording ? 'Listening...' : 'Voice input'}
             >
-              {isRecording ? <FiMicOff size={17} /> : <FiMic size={17} />}
+              {isRecording ? <FiMicOff size={15} /> : <FiMic size={15} />}
             </button>
           )}
 
@@ -146,16 +154,17 @@ const ChatInput = ({ onSendMessage, disabled, placeholder = 'Ask ByteMind anythi
           <button
             type="submit"
             disabled={!message.trim() || disabled}
-            className="h-10 px-4 sm:px-5 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 text-white font-medium text-sm flex items-center gap-2 shadow-md shadow-indigo-500/25 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none hover:scale-[1.02] active:scale-[0.98]"
+            className="h-8 sm:h-10 px-3 sm:px-5 rounded-xl sm:rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 hover:from-violet-500 hover:to-indigo-600 text-white font-medium text-xs sm:text-sm flex items-center gap-1.5 sm:gap-2 shadow-md shadow-indigo-500/25 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none hover:scale-[1.02] active:scale-[0.98]"
             aria-label="Send message"
           >
-            <FiSend size={15} />
+            <FiSend size={14} />
             <span className="hidden sm:inline">Send</span>
           </button>
         </div>
       </div>
 
-      <div className="flex items-center justify-between px-3 pt-1 text-[11px] text-slate-400">
+      {/* Keyboard info bar: Only shown on desktop screens, hidden on mobile/touch screens */}
+      <div className="hidden sm:flex items-center justify-between px-3 pt-1 text-[11px] text-slate-400">
         <span>Press <kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono">Enter</kbd> to send</span>
         <span><kbd className="px-1 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-600 font-mono">Shift + Enter</kbd> for newline</span>
       </div>
