@@ -4,9 +4,11 @@ import {
   FiLogOut,
   FiPlus,
   FiTrash2,
-  FiZap
+  FiZap,
+  FiCamera
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import html2canvas from 'html2canvas';
 import Sidebar from './Sidebar';
 import WelcomeScreen from './WelcomeScreen';
 import ChatMessage from './ChatMessage';
@@ -15,6 +17,7 @@ import ByteMindMascot from './ByteMindMascot';
 
 import {
   sendMessage,
+  generateImage,
   getConversations,
   getConversationMessages,
   deleteConversation,
@@ -29,6 +32,8 @@ const ChatInterface = ({ user, setUser }) => {
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
+  const [isExportingChat, setIsExportingChat] = useState(false);
+
   const messagesEndRef = useRef(null);
   const chatScrollContainerRef = useRef(null);
 
@@ -63,15 +68,84 @@ const ChatInterface = ({ user, setUser }) => {
     }
   };
 
-  const handleSendMessage = async (textToSend) => {
-    if (!textToSend || !textToSend.trim() || loading) return;
+  const handleSendMessage = async (textToSend, options = {}) => {
+    const trimmed = (textToSend || '').trim();
+    const { attachedImage, isImageMode } = options;
 
-    const trimmed = textToSend.trim();
+    if (!trimmed && !attachedImage) return;
+    if (loading) return;
 
-    // Optimistically add user message
+    const isImageRequest = isImageMode || /^\/(image|imagine)\s+/i.test(trimmed);
+
+    if (isImageRequest) {
+      const prompt = trimmed.replace(/^\/(image|imagine)\s+/i, '').trim();
+      if (!prompt) {
+        toast.error('Please provide a description for the image.');
+        return;
+      }
+
+      // Optimistically add user prompt message
+      const userMsg = {
+        role: 'user',
+        content: `/image ${prompt}`,
+        attachedImage: attachedImage || null,
+        timestamp: new Date().toISOString()
+      };
+
+      setMessages((prev) => [...prev, userMsg]);
+      setLoading(true);
+
+      try {
+        const response = await generateImage(prompt, conversationId);
+
+        if (response.success) {
+          const assistantMsg = {
+            role: 'assistant',
+            content: response.message,
+            type: 'image',
+            imageUrl: response.imageUrl,
+            timestamp: response.timestamp || new Date().toISOString()
+          };
+
+          setMessages((prev) => [...prev, assistantMsg]);
+
+          if (response.conversationId) {
+            setConversationId(response.conversationId);
+          }
+
+          loadConversations();
+        } else {
+          const errorText = response.error || response.message || 'Failed to generate image.';
+          const errorMsg = {
+            role: 'assistant',
+            content: errorText,
+            isError: true,
+            timestamp: new Date().toISOString()
+          };
+          setMessages((prev) => [...prev, errorMsg]);
+          toast.error(errorText);
+        }
+      } catch (err) {
+        console.error('Image gen error:', err);
+        const errorMsg = {
+          role: 'assistant',
+          content: err.message || 'Network error while generating image.',
+          isError: true,
+          timestamp: new Date().toISOString()
+        };
+        setMessages((prev) => [...prev, errorMsg]);
+        toast.error('Failed to generate image');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    // Standard Chat Message (with optional attached screenshot)
     const userMsg = {
       role: 'user',
-      content: trimmed,
+      content: trimmed || 'Shared an image',
+      attachedImage: attachedImage || null,
       timestamp: new Date().toISOString()
     };
 
@@ -79,12 +153,14 @@ const ChatInterface = ({ user, setUser }) => {
     setLoading(true);
 
     try {
-      const response = await sendMessage(trimmed, conversationId);
+      const response = await sendMessage(trimmed, conversationId, attachedImage);
 
       if (response.success) {
         const assistantMsg = {
           role: 'assistant',
           content: response.message || response.reply,
+          type: response.type || 'text',
+          imageUrl: response.imageUrl || null,
           timestamp: response.timestamp || new Date().toISOString()
         };
 
@@ -121,16 +197,16 @@ const ChatInterface = ({ user, setUser }) => {
     }
   };
 
-  // Retry the last message
+  // Retry the last user prompt
   const handleRetry = () => {
-    // Find the last user message to resend
     for (let i = messages.length - 1; i >= 0; i--) {
       if (messages[i].role === 'user') {
         const lastUserPrompt = messages[i].content;
+        const lastAttached = messages[i].attachedImage;
         // Strip trailing error assistant messages
         setMessages((prev) => prev.slice(0, i + 1));
         // Resend
-        handleSendMessage(lastUserPrompt);
+        handleSendMessage(lastUserPrompt, { attachedImage: lastAttached });
         return;
       }
     }
@@ -194,6 +270,36 @@ const ChatInterface = ({ user, setUser }) => {
     }
   };
 
+  // Capture full chat thread viewport as PNG screenshot
+  const handleExportChatScreenshot = async () => {
+    if (!chatScrollContainerRef.current || isExportingChat) return;
+    if (messages.length === 0) {
+      toast.error('Start a conversation first to capture a screenshot!');
+      return;
+    }
+
+    setIsExportingChat(true);
+    const toastId = toast.loading('Capturing chat screenshot...');
+    try {
+      const canvas = await html2canvas(chatScrollContainerRef.current, {
+        backgroundColor: '#f8fafc',
+        scale: 2,
+        useCORS: true,
+        logging: false,
+      });
+      const link = document.createElement('a');
+      link.download = `bytemind-chat-${Date.now()}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+      toast.success('Chat screenshot exported!', { id: toastId });
+    } catch (err) {
+      console.error('Failed to export chat screenshot:', err);
+      toast.error('Failed to capture screenshot', { id: toastId });
+    } finally {
+      setIsExportingChat(false);
+    }
+  };
+
   // Get current active conversation title if any
   const currentConv = conversations.find((c) => c.conversationId === conversationId);
   const activeTitle = currentConv ? currentConv.title : (messages.length > 0 ? 'Current Chat' : 'New Chat');
@@ -246,7 +352,7 @@ const ChatInterface = ({ user, setUser }) => {
             {/* Conversation Title & Status */}
             <div className="min-w-0">
               <div className="flex items-center gap-1.5 sm:gap-2">
-                <h1 className="text-xs sm:text-base font-bold text-slate-800 truncate max-w-[140px] sm:max-w-none">
+                <h1 className="text-xs sm:text-base font-bold text-slate-800 truncate max-w-[130px] sm:max-w-none">
                   {activeTitle}
                 </h1>
                 <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-violet-100/70 text-violet-700 text-[9px] sm:text-[10px] font-semibold border border-violet-200/60">
@@ -255,13 +361,27 @@ const ChatInterface = ({ user, setUser }) => {
                 </span>
               </div>
               <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
-                Powered by Groq Cloud AI
+                AI Assistant with Instant Image Generation
               </p>
             </div>
           </div>
 
           {/* Quick Header Actions */}
           <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Full Chat Screenshot Export Button */}
+            {messages.length > 0 && (
+              <button
+                type="button"
+                onClick={handleExportChatScreenshot}
+                disabled={isExportingChat}
+                className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl glass-card hover:bg-white text-slate-700 text-xs font-medium transition-all shadow-xs border border-white/80"
+                title="Export entire chat as PNG screenshot"
+              >
+                <FiCamera size={14} className={isExportingChat ? 'animate-pulse text-violet-600' : 'text-violet-600'} />
+                <span className="hidden sm:inline">{isExportingChat ? 'Capturing...' : 'Screenshot'}</span>
+              </button>
+            )}
+
             <button
               onClick={handleNewChat}
               className="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1.5 rounded-xl glass-card hover:bg-white text-slate-700 text-xs font-medium transition-all shadow-xs border border-white/80"
@@ -312,7 +432,7 @@ const ChatInterface = ({ user, setUser }) => {
                 />
               ))}
 
-              {/* Typing / Loading Glass State */}
+              {/* Typing / Generating Glass State */}
               {loading && (
                 <div className="flex items-start gap-3 mb-6 animate-fade-in">
                   <div className="w-8 h-8 rounded-full bg-white/90 border border-violet-200/80 flex items-center justify-center shadow-sm shrink-0">
@@ -324,7 +444,7 @@ const ChatInterface = ({ user, setUser }) => {
                       <span className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                       <span className="w-2 h-2 rounded-full bg-sky-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                     </div>
-                    <span className="text-xs font-medium text-slate-500">ByteMind is thinking...</span>
+                    <span className="text-xs font-medium text-slate-500">ByteMind is crafting your response...</span>
                   </div>
                 </div>
               )}
@@ -340,7 +460,7 @@ const ChatInterface = ({ user, setUser }) => {
             <ChatInput
               onSendMessage={handleSendMessage}
               disabled={loading}
-              placeholder="Ask ByteMind anything..."
+              placeholder="Ask ByteMind anything, paste a screenshot (Ctrl+V), or generate art..."
             />
           </div>
         </div>

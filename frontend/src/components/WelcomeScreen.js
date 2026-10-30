@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { FiCode, FiZap, FiBookOpen, FiCompass } from 'react-icons/fi';
+import { FiCode, FiZap, FiImage, FiCompass } from 'react-icons/fi';
 import ByteMindMascot from './ByteMindMascot';
 
 const PROMPT_SUGGESTIONS = [
@@ -10,6 +10,13 @@ const PROMPT_SUGGESTIONS = [
     title: 'Explain Async JavaScript',
     prompt: 'Explain asynchronous JavaScript, Promises, and async/await with clean real-world code examples.',
     color: 'from-violet-500 to-indigo-500'
+  },
+  {
+    icon: FiImage,
+    category: 'AI Art',
+    title: 'Generate Cyberpunk Art',
+    prompt: '/image A stunning cyberpunk metropolis at twilight with glowing holographic billboards and neon rain, 8k wallpaper',
+    color: 'from-pink-500 to-rose-500'
   },
   {
     icon: FiZap,
@@ -24,13 +31,6 @@ const PROMPT_SUGGESTIONS = [
     title: '5 Modern AI Startup Ideas',
     prompt: 'Brainstorm 5 innovative, practical SaaS product ideas that leverage modern AI agents.',
     color: 'from-sky-500 to-teal-500'
-  },
-  {
-    icon: FiBookOpen,
-    category: 'Writing',
-    title: 'Polish Professional Email',
-    prompt: 'Help me draft a concise, persuasive status update email for executive stakeholders.',
-    color: 'from-purple-500 to-pink-500'
   }
 ];
 

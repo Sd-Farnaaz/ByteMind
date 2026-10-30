@@ -10,6 +10,17 @@ const messageSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  type: {
+    type: String,
+    enum: ['text', 'image'],
+    default: 'text'
+  },
+  imageUrl: {
+    type: String
+  },
+  attachedImage: {
+    type: String
+  },
   timestamp: {
     type: Date,
     default: Date.now

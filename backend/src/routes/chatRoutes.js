@@ -2,6 +2,7 @@ const express = require('express');
 const { protect } = require('../middleware/auth');
 const {
   sendMessage,
+  generateImage,
   getConversations,
   getConversationMessages,
   clearConversation,
@@ -15,6 +16,7 @@ const router = express.Router();
 router.use(protect);
 
 router.post('/message', sendMessage);
+router.post('/generate-image', generateImage);
 router.get('/conversations', getConversations);
 router.get('/conversation/:conversationId', getConversationMessages);
 router.patch('/conversation/clear', clearConversation);

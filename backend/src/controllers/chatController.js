@@ -18,16 +18,110 @@ try {
   console.error('❌ Groq initialization failed:', error.message);
 }
 
-const sendMessage = async (req, res) => {
+const generateImage = async (req, res) => {
   try {
-    const { message, conversationId: tempConvId } = req.body;
+    const { prompt, conversationId: tempConvId } = req.body;
     const userId = req.user.id;
 
-    if (!message || !message.trim()) {
+    if (!prompt || !prompt.trim()) {
       return res.status(400).json({
         success: false,
-        message: 'Message content cannot be empty.'
+        message: 'Prompt is required for image generation.'
       });
+    }
+
+    const cleanPrompt = prompt.trim();
+    console.log(`🎨 Generating image for user ${userId}: "${cleanPrompt}"`);
+
+    // Find or create conversation
+    let conversation = null;
+    if (tempConvId) {
+      conversation = await Conversation.findOne({ userId, conversationId: tempConvId });
+    }
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        userId,
+        conversationId: `conv_${Date.now()}`,
+        title: `🎨 ${cleanPrompt.slice(0, 40)}`,
+        messages: []
+      });
+
+      await User.findByIdAndUpdate(userId, {
+        $push: {
+          conversations: {
+            conversationId: conversation.conversationId,
+            title: conversation.title,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        }
+      });
+    }
+
+    // Add user prompt to conversation history
+    conversation.messages.push({
+      role: 'user',
+      content: cleanPrompt.startsWith('/image') ? cleanPrompt : `/image ${cleanPrompt}`,
+      type: 'text',
+      timestamp: new Date()
+    });
+
+    // Generate Pollinations Flux image URL
+    const seed = Math.floor(Math.random() * 10000000);
+    const imageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPrompt.replace(/^\/(image|imagine)\s+/i, ''))}?width=1024&height=1024&seed=${seed}&nologo=true&model=flux`;
+
+    // Add assistant response with image
+    const assistantMessage = {
+      role: 'assistant',
+      content: `🎨 Generated image for: "${cleanPrompt.replace(/^\/(image|imagine)\s+/i, '')}"`,
+      type: 'image',
+      imageUrl: imageUrl,
+      timestamp: new Date()
+    };
+    conversation.messages.push(assistantMessage);
+
+    conversation.updatedAt = new Date();
+    await conversation.save();
+
+    console.log(`✅ Image generated and saved for user ${userId}`);
+
+    return res.json({
+      success: true,
+      message: assistantMessage.content,
+      type: 'image',
+      imageUrl: imageUrl,
+      conversationId: conversation.conversationId,
+      timestamp: assistantMessage.timestamp.toISOString()
+    });
+  } catch (error) {
+    console.error('❌ Error generating image:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to generate image',
+      conversationId: req.body.conversationId || `conv_${Date.now()}`
+    });
+  }
+};
+
+const sendMessage = async (req, res) => {
+  try {
+    const { message, conversationId: tempConvId, attachedImage } = req.body;
+    const userId = req.user.id;
+
+    if ((!message || !message.trim()) && !attachedImage) {
+      return res.status(400).json({
+        success: false,
+        message: 'Message content or an attached image is required.'
+      });
+    }
+
+    const trimmedMessage = (message || '').trim();
+
+    // Check if user requested image generation via slash command
+    if (/^\/(image|imagine)\s+/i.test(trimmedMessage)) {
+      req.body.prompt = trimmedMessage.replace(/^\/(image|imagine)\s+/i, '').trim();
+      return generateImage(req, res);
     }
 
     console.log(`📨 Received message from user ${userId}`);
@@ -46,7 +140,7 @@ const sendMessage = async (req, res) => {
       conversation = await Conversation.create({
         userId,
         conversationId: `conv_${Date.now()}`,
-        title: message.trim().slice(0, 50),
+        title: trimmedMessage ? trimmedMessage.slice(0, 50) : 'Attached Screenshot',
         messages: []
       });
 
@@ -62,17 +156,21 @@ const sendMessage = async (req, res) => {
       });
     }
 
-    // Add user message to conversation history
+    // Add user message to conversation history (with attachedImage if provided)
     conversation.messages.push({
       role: 'user',
-      content: message.trim(),
+      content: trimmedMessage || 'Shared an image',
+      type: 'text',
+      attachedImage: attachedImage || null,
       timestamp: new Date()
     });
 
     // Prepare messages for AI (last 10 turns context)
     const chatHistory = conversation.messages.slice(-10).map(msg => ({
       role: msg.role === 'user' ? 'user' : 'assistant',
-      content: msg.content
+      content: msg.attachedImage
+        ? `${msg.content}\n[Note: User attached an image/screenshot with this message]`
+        : (msg.content || '')
     }));
 
     if (!groq) {
@@ -337,6 +435,7 @@ const renameConversation = async (req, res) => {
 
 module.exports = {
   sendMessage,
+  generateImage,
   getConversations,
   getConversationMessages,
   clearConversation,

@@ -44,17 +44,37 @@ api.interceptors.response.use(
   }
 );
 
-// Send message to AI
-export const sendMessage = async (message, conversationId = null) => {
+// Send message to AI (supports optional attached screenshot/image)
+export const sendMessage = async (message, conversationId = null, attachedImage = null) => {
   try {
     const response = await api.post('/chat/message', {
       message,
-      conversationId
+      conversationId,
+      attachedImage
     });
     return response.data;
   } catch (error) {
     console.error('Send message error:', error.response?.data || error.message);
     const errorMessage = error.response?.data?.message || error.message || 'Failed to send message';
+    return {
+      success: false,
+      error: errorMessage,
+      conversationId: error.response?.data?.conversationId || conversationId
+    };
+  }
+};
+
+// Generate image via AI
+export const generateImage = async (prompt, conversationId = null) => {
+  try {
+    const response = await api.post('/chat/generate-image', {
+      prompt,
+      conversationId
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Generate image error:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.message || error.message || 'Failed to generate image';
     return {
       success: false,
       error: errorMessage,
